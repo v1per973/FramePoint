@@ -34,15 +34,13 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   let coco = null;
   let pose = null;
-  async function loadModels() {
-    coco = await cocoSsd.load();
-    pose = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
-    });
-  }
+  let currentDeviceId = null;
 
   async function setupCamera(deviceId) {
-    if (window.stream) window.stream.getTracks().forEach(t => t.stop());
+    if (window.stream) {
+      window.stream.getTracks().forEach(t => t.stop());
+      video.srcObject = null;
+    }
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
@@ -53,7 +51,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     video.srcObject = stream;
     window.stream = stream;
     await video.play();
-    await loadModels();
   }
 
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -65,11 +62,32 @@ window.addEventListener("DOMContentLoaded", async () => {
     cameraSelect.appendChild(o);
   });
 
-  if (cams.length > 0) await setupCamera(cams[0].deviceId);
-  cameraSelect.onchange = async () => await setupCamera(cameraSelect.value);
+  async function loadModels() {
+    coco = await cocoSsd.load();
+    pose = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+    });
+  }
 
-  await loadModels();
-  info.innerText = "Detecting...";
+  async function initCameraAndModels(deviceId) {
+    currentDeviceId = deviceId;
+    info.innerText = "Switching camera and reloading models...";
+    await setupCamera(deviceId);
+    if (!coco || !pose) await loadModels();
+    info.innerText = "Detecting...";
+  }
+
+  cameraSelect.onchange = async () => {
+    const selectedId = cameraSelect.value;
+    if (selectedId !== currentDeviceId) {
+      await initCameraAndModels(selectedId);
+    }
+  };
+
+  if (cams.length > 0) {
+    await initCameraAndModels(cams[0].deviceId);
+  }
+
   let lastDetection = performance.now();
   let lastTime = performance.now();
   let logicalTarget = { x: 0.5, y: 0.5 };
@@ -122,6 +140,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
+
+    if (!vw || !vh || !video.srcObject || video.readyState < 2) {
+      requestAnimationFrame(detect);
+      return;
+    }
 
     const poses = await pose.estimatePoses(video, { maxPoses: 1 });
     let detected = false;
