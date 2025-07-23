@@ -32,6 +32,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
+  let coco = null;
+  let pose = null;
+  async function loadModels() {
+    coco = await cocoSsd.load();
+    pose = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+    });
+  }
+
   async function setupCamera(deviceId) {
     if (window.stream) window.stream.getTracks().forEach(t => t.stop());
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -44,6 +53,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     video.srcObject = stream;
     window.stream = stream;
     await video.play();
+    await loadModels();
   }
 
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -58,11 +68,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (cams.length > 0) await setupCamera(cams[0].deviceId);
   cameraSelect.onchange = async () => await setupCamera(cameraSelect.value);
 
-  const coco = await cocoSsd.load();
-  const pose = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
-  });
-
+  await loadModels();
   info.innerText = "Detecting...";
   let lastDetection = performance.now();
   let lastTime = performance.now();
