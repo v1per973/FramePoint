@@ -1,0 +1,108 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  overflow: hidden;
+}
+
+video, canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  background: black;
+  z-index: 0;
+}
+
+#info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: auto;
+  max-width: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 15px;
+  padding: 6px 10px;
+  color: #0f0;
+  z-index: 2;
+}
+
+#status {
+  display: none;
+}
+
+#stats {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 15px;
+  padding: 9px 11px;
+  z-index: 3;
+}
+
+#settingsBtn {
+  display: none;
+}
+
+#fullscreenBtn {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  background: #111;
+  color: #0f0;
+  border: 1px solid #0f0;
+  padding: 5px 8px;
+  font-size: 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+#settingsToggleIcon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  background: #111;
+  padding: 5px 10px;
+  color: #0f0;
+  z-index: 10;
+}
+
+#settingsPanel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #111;
+  color: #0f0;
+  padding: 14px;
+  display: block;
+  z-index: 3;
+  border-radius: 8px;
+  width: 260px;
+}
+
+select {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  background: #000;
+  color: #0f0;
+  border: 1px solid #0f0;
+  border-radius: 4px;
+  font-size: 14px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FramePoint</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.13.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection/dist/movenet.js"></script>
+  <script src="assets/script.js" defer></script>
+</head>
+<body>
+  <div id="stats">
+    CPU: <span id="cpuUsage">nm</span> |
+    FPS: <span id="fpsDisplay">nm</span> |
+    TTF: <span id="detectTime">nm</span>
+  </div>
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+  <div id="info">Welcome to FramePoint – Loading models...</div>
+  <button id="fullscreenBtn">⛶</button>
+  <div id="settingsToggleIcon">✖</div>
+  <div id="settingsPanel">
+    <label>Camera:
+      <select id="cameraSelect"></select>
+    </label>
+  </div>
+</body>
+</html>
