@@ -178,19 +178,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         dotColor = "#0f0";
         detected = true;
         lastDetection = performance.now();
-      } else {
-        const rightWrist = keypoints.find(k => k.name === "right_wrist" && k.score > 0.2);
-        const leftWrist = keypoints.find(k => k.name === "left_wrist" && k.score > 0.2);
-        const wrist = rightWrist || leftWrist;
-        if (wrist) {
-          keyX = wrist.x / vw;
-          keyY = wrist.y / vh;
-          logicalTarget.x = keyX;
-          logicalTarget.y = keyY;
-          dotColor = rightWrist ? "#00f" : "#f00";
-          detected = true;
-          lastDetection = performance.now();
-        }
       }
     }
 
