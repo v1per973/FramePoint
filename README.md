@@ -21,6 +21,3 @@ FramePoint is a browser-based person tracking system using TensorFlow.js. It com
    - Draws the video frame and overlays tracking visuals
 3. The green dot represents the computed center of the detected face
 4. Stats are updated periodically and shown in the top-left corner
-
-## File Overview
-
