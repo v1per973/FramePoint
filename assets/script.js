@@ -163,7 +163,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     let detected = false;
     let keyX = 0.5;
     let keyY = 0.5;
-    let dotColor = "#f00";
 
     if (poses.length > 0 && poses[0].keypoints) {
       const keypoints = poses[0].keypoints;
@@ -175,7 +174,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         keyY = (leftEye.y + rightEye.y) / 2 / vh;
         logicalTarget.x = keyX;
         logicalTarget.y = keyY;
-        dotColor = "#0f0";
         detected = true;
         lastDetection = performance.now();
       }
@@ -185,12 +183,14 @@ window.addEventListener("DOMContentLoaded", async () => {
     const x = Math.round(drawResult.dx + logicalTarget.x * drawResult.dw);
     const y = Math.round(drawResult.dy + logicalTarget.y * drawResult.dh);
 
-    ctx.beginPath();
-    ctx.arc(x, y, 6, 0, 2 * Math.PI);
-    ctx.fillStyle = dotColor;
-    ctx.fill();
+    if (detected) {
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = "#0f0";
+      ctx.fill();
+    }
 
-    const faceBox = getFaceBoundingBox(poses[0].keypoints);
+    const faceBox = poses.length > 0 && poses[0].keypoints ? getFaceBoundingBox(poses[0].keypoints) : null;
     const z = faceBox ? Math.round(2000 / faceBox.w) : 40;
     const now = performance.now();
 
