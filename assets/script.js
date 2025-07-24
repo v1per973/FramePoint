@@ -1,21 +1,21 @@
+// script.js
 window.addEventListener("DOMContentLoaded", async () => {
+  await tf.setBackend('webgl');
+  await tf.ready();
+
   const $ = id => document.getElementById(id);
   const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
   const info = $("info");
   const cameraSelect = $("cameraSelect");
   const settingsPanel = $("settingsPanel"), settingsToggleIcon = $("settingsToggleIcon");
 
-  const fixedCanvasWidth = 3840;
-  const fixedCanvasHeight = 2160;
+  const fixedCanvasWidth = 1920;
+  const fixedCanvasHeight = 1080;
   canvas.width = fixedCanvasWidth;
   canvas.height = fixedCanvasHeight;
 
   settingsPanel.style.display = "none";
   settingsToggleIcon.textContent = "⚙";
-
-  let lastStatUpdate = 0;
-  let lastInfoUpdate = 0;
-  let lastCPU = "nm", lastFPS = "nm", lastTTF = "nm";
 
   settingsToggleIcon.onclick = () => {
     settingsPanel.style.display =
@@ -32,9 +32,11 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  let coco = null;
   let pose = null;
   let currentDeviceId = null;
+  let lastInfoUpdate = 0;
+  let lastStatUpdate = 0;
+  let lastCPU = "nm", lastFPS = "nm", lastTTF = "nm";
 
   async function setupCamera(deviceId) {
     if (window.stream) {
@@ -44,8 +46,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         deviceId: deviceId ? { exact: deviceId } : undefined,
-        width: { ideal: 3840, min: 1920 },
-        height: { ideal: 2160, min: 1080 }
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 }
       }
     });
     video.srcObject = stream;
@@ -54,7 +56,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   const devices = await navigator.mediaDevices.enumerateDevices();
-  const cams = devices.filter(d => d.kind === "videoinput").sort((a, b) => (b.label || "").localeCompare(a.label || ""));
+  const cams = devices
+    .filter(d => d.kind === "videoinput")
+    .sort((a, b) => (a.label || "").toLowerCase().localeCompare((b.label || "").toLowerCase()));
   cams.forEach((d, i) => {
     const o = document.createElement("option");
     o.value = d.deviceId;
@@ -62,8 +66,11 @@ window.addEventListener("DOMContentLoaded", async () => {
     cameraSelect.appendChild(o);
   });
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestedCamera = urlParams.get("camera");
+  const foundCamera = cams.find(c => c.deviceId === requestedCamera);
+
   async function loadModels() {
-    coco = await cocoSsd.load();
     pose = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
       modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
     });
@@ -73,27 +80,36 @@ window.addEventListener("DOMContentLoaded", async () => {
     currentDeviceId = deviceId;
     info.innerText = "Switching camera and reloading models...";
     await setupCamera(deviceId);
-    if (!coco || !pose) await loadModels();
+    await loadModels();
     info.innerText = "Detecting...";
   }
 
   cameraSelect.onchange = async () => {
-    const selectedId = cameraSelect.value;
-    if (selectedId !== currentDeviceId) {
-      await initCameraAndModels(selectedId);
+    if (window.stream) {
+      window.stream.getTracks().forEach(t => t.stop());
     }
+    const selectedId = cameraSelect.value;
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set("camera", selectedId);
+    const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+    window.location.href = newUrl;
   };
 
   if (cams.length > 0) {
-    await initCameraAndModels(cams[0].deviceId);
+    const startCam = foundCamera ? foundCamera.deviceId : cams[0].deviceId;
+    cameraSelect.value = startCam;
+    await initCameraAndModels(startCam);
   }
 
   let lastDetection = performance.now();
   let lastTime = performance.now();
   let logicalTarget = { x: 0.5, y: 0.5 };
+  let lastDrawnFrameTime = 0;
+  const minFrameInterval = 1000 / 70;
 
   function drawVideoFrame(video, ctx, cw, ch) {
-    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, cw, ch);
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const videoRatio = vw / vh;
@@ -113,9 +129,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getFaceBoundingBox(keypoints) {
-    const relevant = ["left_eye", "right_eye", "nose", "left_ear", "right_ear"].map(name =>
-      keypoints.find(k => k.name === name && k.score > 0.4)
-    ).filter(Boolean);
+    const relevant = ["left_eye", "right_eye", "nose", "left_ear", "right_ear"]
+      .map(name => keypoints.find(k => k.name === name && k.score > 0.2))
+      .filter(Boolean);
     if (relevant.length < 2) return null;
 
     const xs = relevant.map(k => k.x);
@@ -129,74 +145,77 @@ window.addEventListener("DOMContentLoaded", async () => {
     };
   }
 
-  function round1(v) {
-    return Math.round(v);
-  }
-
-  async function detect() {
-    const start = performance.now();
-    const cw = fixedCanvasWidth;
-    const ch = fixedCanvasHeight;
-
+  async function detect(timestamp) {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    if (!vw || !vh || !video.srcObject || video.readyState < 2) {
+    if (!pose || timestamp - lastDrawnFrameTime < minFrameInterval || !vw || !vh || !video.srcObject || video.readyState < 2) {
       requestAnimationFrame(detect);
       return;
     }
+
+    lastDrawnFrameTime = timestamp;
+    const start = performance.now();
+    const cw = fixedCanvasWidth;
+    const ch = fixedCanvasHeight;
 
     const poses = await pose.estimatePoses(video, { maxPoses: 1 });
     let detected = false;
     let keyX = 0.5;
     let keyY = 0.5;
+    let dotColor = "#f00";
 
     if (poses.length > 0 && poses[0].keypoints) {
-      const leftEye = poses[0].keypoints.find(k => k.name === "left_eye" && k.score > 0.4);
-      const rightEye = poses[0].keypoints.find(k => k.name === "right_eye" && k.score > 0.4);
+      const keypoints = poses[0].keypoints;
+      const leftEye = keypoints.find(k => k.name === "left_eye" && k.score > 0.2);
+      const rightEye = keypoints.find(k => k.name === "right_eye" && k.score > 0.2);
+
       if (leftEye && rightEye) {
         keyX = (leftEye.x + rightEye.x) / 2 / vw;
         keyY = (leftEye.y + rightEye.y) / 2 / vh;
         logicalTarget.x = keyX;
         logicalTarget.y = keyY;
-
-        lastDetection = performance.now();
+        dotColor = "#0f0";
         detected = true;
+        lastDetection = performance.now();
+      } else {
+        const rightWrist = keypoints.find(k => k.name === "right_wrist" && k.score > 0.2);
+        const leftWrist = keypoints.find(k => k.name === "left_wrist" && k.score > 0.2);
+        const wrist = rightWrist || leftWrist;
+        if (wrist) {
+          keyX = wrist.x / vw;
+          keyY = wrist.y / vh;
+          logicalTarget.x = keyX;
+          logicalTarget.y = keyY;
+          dotColor = rightWrist ? "#00f" : "#f00";
+          detected = true;
+          lastDetection = performance.now();
+        }
       }
     }
 
     const drawResult = drawVideoFrame(video, ctx, cw, ch);
+    const x = Math.round(drawResult.dx + logicalTarget.x * drawResult.dw);
+    const y = Math.round(drawResult.dy + logicalTarget.y * drawResult.dh);
 
-    if (detected) {
-      const x = round1(drawResult.dx + logicalTarget.x * drawResult.dw);
-      const y = round1(drawResult.dy + logicalTarget.y * drawResult.dh);
-      const faceBox = getFaceBoundingBox(poses[0].keypoints);
-      const rawDistance = faceBox ? (faceBox.w + faceBox.h) : 40;
-      const z = round1(5000 / rawDistance);
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = dotColor;
+    ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = "#0f0";
-      ctx.fill();
+    const faceBox = getFaceBoundingBox(poses[0].keypoints);
+    const z = faceBox ? Math.round(2000 / faceBox.w) : 40;
+    const now = performance.now();
 
-      const now = performance.now();
-      if (now - lastInfoUpdate > 100) {
-        info.innerText = `x:${x} y:${y} z:${z}`;
-        lastInfoUpdate = now;
-      }
-    } else {
-      const now = performance.now();
-      if (now - lastInfoUpdate > 100) {
-        info.innerText = "No detection (holding position)";
-        lastInfoUpdate = now;
-      }
+    if (now - lastInfoUpdate > 100) {
+      info.innerText = detected ? `x:${x} y:${y} z:${z}` : "No detection";
+      lastInfoUpdate = now;
     }
 
-    const duration = performance.now() - start;
-    const delta = performance.now() - lastTime;
-    lastTime = performance.now();
+    const duration = now - start;
+    const delta = now - lastTime;
+    lastTime = now;
 
-    const now = performance.now();
     if (now - lastStatUpdate > 250) {
       lastCPU = `${Math.round((duration / delta) * 100)}%`;
       lastFPS = `${Math.round(1000 / delta)}`;
@@ -210,5 +229,5 @@ window.addEventListener("DOMContentLoaded", async () => {
     requestAnimationFrame(detect);
   }
 
-  detect();
+  requestAnimationFrame(detect);
 });
